@@ -1,0 +1,17 @@
+/.vs/
+/.vscode/
+/output/
+**/node_modules/
+*.obj
+*.pdb
+*.ilk
+*.ipch
+*.log
+*.tmp
+*.user
+*.suo
+/pid_tests.exe
+/pid_monitor_tests.exe
+/pid.exe.manifest
+.env
+.env.*

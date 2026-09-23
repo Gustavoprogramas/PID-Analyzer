@@ -1,0 +1,12 @@
+{
+  "name": "ui-assets-exporter",
+  "version": "1.0.0",
+  "description": "Exportador de assets UI em PNG usando HTML/CSS + Playwright",
+  "main": "export.js",
+  "scripts": {
+    "export": "node export.js"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}

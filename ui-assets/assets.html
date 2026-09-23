@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dark Purple Tech UI Assets</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="stage">
+    <section class="preview-group">
+      <h2>Superficies da interface nativa (sem dados de exemplo)</h2>
+      <div class="preview-row">
+        <div id="surface-card" class="native-surface native-card"></div>
+        <div id="surface-console" class="native-surface native-console"></div>
+      </div>
+    </section>
+
+    <!-- BOTÕES -->
+    <section class="preview-group">
+      <h2>Botões</h2>
+      <div class="preview-row">
+        <div id="btn-start-normal" class="btn btn-primary">INICIAR MONITOR</div>
+        <div id="btn-start-hover" class="btn btn-primary hover">INICIAR MONITOR</div>
+        <div id="btn-start-pressed" class="btn btn-primary pressed">INICIAR MONITOR</div>
+      </div>
+
+      <div class="preview-row">
+        <div id="btn-stop-normal" class="btn btn-danger">PARAR MONITOR</div>
+        <div id="btn-stop-hover" class="btn btn-danger hover">PARAR MONITOR</div>
+        <div id="btn-stop-pressed" class="btn btn-danger pressed">PARAR MONITOR</div>
+      </div>
+
+      <div class="preview-row">
+        <div id="btn-settings-normal" class="btn btn-secondary">CONFIGURAÇÕES</div>
+        <div id="btn-settings-hover" class="btn btn-secondary hover">CONFIGURAÇÕES</div>
+        <div id="btn-settings-pressed" class="btn btn-secondary pressed">CONFIGURAÇÕES</div>
+      </div>
+
+      <div class="preview-row">
+        <div id="btn-export-normal" class="btn btn-accent">EXPORTAR RELATÓRIO</div>
+        <div id="btn-export-hover" class="btn btn-accent hover">EXPORTAR RELATÓRIO</div>
+        <div id="btn-export-pressed" class="btn btn-accent pressed">EXPORTAR RELATÓRIO</div>
+      </div>
+    </section>
+
+    <!-- BADGES -->
+    <section class="preview-group">
+      <h2>Badges</h2>
+      <div class="preview-row">
+        <div id="badge-low" class="badge badge-low">BAIXO</div>
+        <div id="badge-attention" class="badge badge-attention">ATENÇÃO</div>
+        <div id="badge-suspicious" class="badge badge-suspicious">SUSPEITO</div>
+        <div id="badge-highrisk" class="badge badge-highrisk">ALTO RISCO</div>
+      </div>
+    </section>
+
+    <!-- STATUS DOTS -->
+    <section class="preview-group">
+      <h2>Status Dots</h2>
+      <div class="preview-row">
+        <div id="status-dot-active" class="status-dot-wrap">
+          <span class="status-dot dot-active"></span>
+        </div>
+        <div id="status-dot-warning" class="status-dot-wrap">
+          <span class="status-dot dot-warning"></span>
+        </div>
+        <div id="status-dot-danger" class="status-dot-wrap">
+          <span class="status-dot dot-danger"></span>
+        </div>
+        <div id="status-dot-paused" class="status-dot-wrap">
+          <span class="status-dot dot-paused"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARDS -->
+    <section class="preview-group">
+      <h2>Cards</h2>
+      <div class="preview-row">
+        <div id="card-status" class="card stat-card">
+          <div class="card-top">
+            <span class="tiny-label">STATUS DO MONITOR</span>
+            <span class="mini-pill">EM TEMPO REAL</span>
+          </div>
+          <div class="big-value">ATIVO</div>
+          <div class="sub-value">Observando processos, rede e storage sensível</div>
+          <div class="meter">
+            <div class="meter-fill meter-purple" style="width: 82%;"></div>
+          </div>
+        </div>
+
+        <div id="card-alerts" class="card stat-card">
+          <div class="card-top">
+            <span class="tiny-label">ALERTAS DO DIA</span>
+            <span class="mini-pill">24H</span>
+          </div>
+          <div class="big-value">14</div>
+          <div class="sub-value">3 em alto risco · 5 suspeitos · 6 atenção</div>
+          <div class="meter">
+            <div class="meter-fill meter-pink" style="width: 61%;"></div>
+          </div>
+        </div>
+
+        <div id="card-risk" class="card stat-card">
+          <div class="card-top">
+            <span class="tiny-label">RISCO ATUAL</span>
+            <span class="mini-pill">SISTEMA</span>
+          </div>
+          <div class="big-value">SUSPEITO</div>
+          <div class="sub-value">Correlação ativa de comportamento e conexões</div>
+          <div class="meter">
+            <div class="meter-fill meter-red" style="width: 73%;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALERT CARD -->
+    <section class="preview-group">
+      <h2>Alert Card</h2>
+      <div class="preview-row">
+        <div id="alert-card" class="alert-card">
+          <div class="alert-card-top">
+            <div>
+              <div class="alert-title">python.exe</div>
+              <div class="alert-subtitle">PID 8420 · C:\Users\User\AppData\Roaming\cache\python.exe</div>
+            </div>
+            <div class="badge badge-highrisk">ALTO RISCO</div>
+          </div>
+
+          <div class="alert-evidences">
+            <div class="evidence">+2 Interpretador com conexão externa</div>
+            <div class="evidence">+4 Persistência correlacionada em Run/RunOnce</div>
+            <div class="evidence">+5 Handle aberto para armazenamento de navegador</div>
+          </div>
+
+          <div class="alert-footer">
+            <div class="mini-pill">Discord / Browser Storage</div>
+            <div class="mini-pill">Webhook / HTTPS</div>
+            <div class="mini-pill">Assinatura inválida</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONSOLE -->
+    <section class="preview-group">
+      <h2>Console</h2>
+      <div class="preview-row">
+        <div id="console-panel" class="console-panel">
+          <div class="console-header">
+            <span>FEED EM TEMPO REAL</span>
+            <span class="console-live">LIVE</span>
+          </div>
+          <div class="console-body">
+            <div class="console-line info">[12:31:02] Processo detectado: python.exe (PID 8420)</div>
+            <div class="console-line warn">[12:31:03] Acesso a Local Storage\\leveldb observado</div>
+            <div class="console-line warn">[12:31:03] Conexão TCP externa: 45.184.120.22:443</div>
+            <div class="console-line danger">[12:31:04] ALERTA: interpretador + storage sensível + tráfego externo</div>
+            <div class="console-line soft">[12:31:04] Score atualizado: 15 · Classificação: ALTO RISCO</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SIDEBAR -->
+    <section class="preview-group">
+      <h2>Sidebar</h2>
+      <div class="preview-row">
+        <aside id="sidebar-panel" class="sidebar">
+          <div class="sidebar-logo">
+            <div class="logo-mark"></div>
+            <div class="logo-text">
+              <strong>Sentinel UI</strong>
+              <span>dark purple edition</span>
+            </div>
+          </div>
+
+          <nav class="nav">
+            <div class="nav-item active"><span class="nav-icon"></span> Dashboard</div>
+            <div class="nav-item"><span class="nav-icon"></span> Alertas</div>
+            <div class="nav-item"><span class="nav-icon"></span> Processos</div>
+            <div class="nav-item"><span class="nav-icon"></span> Logs</div>
+            <div class="nav-item"><span class="nav-icon"></span> Relatórios</div>
+            <div class="nav-item"><span class="nav-icon"></span> Configurações</div>
+          </nav>
+
+          <div class="sidebar-footer">
+            <div class="mini-status">
+              <span class="status-dot dot-active"></span>
+              Monitoramento ativo
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- TOPBAR -->
+    <section class="preview-group">
+      <h2>Topbar</h2>
+      <div class="preview-row">
+        <header id="topbar-panel" class="topbar">
+          <div class="topbar-left">
+            <div class="search-box">Pesquisar PID, processo, evento...</div>
+          </div>
+          <div class="topbar-right">
+            <div class="top-chip">MONITOR ATIVO</div>
+            <div class="top-chip">14 ALERTAS</div>
+            <div class="user-bubble">U</div>
+          </div>
+        </header>
+      </div>
+    </section>
+
+    <!-- DASHBOARD PREVIEW -->
+    <section class="preview-group">
+      <h2>Dashboard Preview</h2>
+      <div class="preview-row">
+        <div id="dashboard-preview" class="dashboard-preview">
+          <aside class="dashboard-sidebar">
+            <div class="sidebar-logo small">
+              <div class="logo-mark"></div>
+              <div class="logo-text">
+                <strong>Sentinel UI</strong>
+                <span>monitor</span>
+              </div>
+            </div>
+            <div class="dashboard-nav-item active">Dashboard</div>
+            <div class="dashboard-nav-item">Alertas</div>
+            <div class="dashboard-nav-item">Processos</div>
+            <div class="dashboard-nav-item">Logs</div>
+          </aside>
+
+          <div class="dashboard-main">
+            <div class="dashboard-topbar">
+              <div class="search-box wide">Pesquisar por processo, IP, score...</div>
+              <div class="top-chip">ATIVO</div>
+            </div>
+
+            <div class="dashboard-cards">
+              <div class="card stat-card small-card">
+                <div class="tiny-label">STATUS</div>
+                <div class="big-value">ATIVO</div>
+                <div class="sub-value">Monitor online</div>
+              </div>
+              <div class="card stat-card small-card">
+                <div class="tiny-label">ALERTAS</div>
+                <div class="big-value">14</div>
+                <div class="sub-value">nas últimas 24h</div>
+              </div>
+              <div class="card stat-card small-card">
+                <div class="tiny-label">RISCO</div>
+                <div class="big-value">SUSPEITO</div>
+                <div class="sub-value">investigação sugerida</div>
+              </div>
+            </div>
+
+            <div class="dashboard-bottom">
+              <div class="console-panel compact">
+                <div class="console-header">
+                  <span>LOGS</span>
+                  <span class="console-live">LIVE</span>
+                </div>
+                <div class="console-body">
+                  <div class="console-line info">[12:31:02] Processo detectado: python.exe</div>
+                  <div class="console-line warn">[12:31:03] Storage sensível observado</div>
+                  <div class="console-line danger">[12:31:04] Score 15 · ALTO RISCO</div>
+                </div>
+              </div>
+
+              <div class="alert-card compact-card">
+                <div class="alert-card-top">
+                  <div>
+                    <div class="alert-title">python.exe</div>
+                    <div class="alert-subtitle">PID 8420</div>
+                  </div>
+                  <div class="badge badge-highrisk">ALTO RISCO</div>
+                </div>
+                <div class="alert-evidences">
+                  <div class="evidence">+ conexão externa</div>
+                  <div class="evidence">+ handle de navegador</div>
+                  <div class="evidence">+ persistência</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
