@@ -2,6 +2,7 @@
 #include "pid_etw.h"
 #include <condition_variable>
 #include <memory>
+#include "pid_shield.h"
 
 using ProcessKey = std::pair<DWORD, ULONGLONG>;
 ProcessKey processKey(const Process& p) { return { p.pid, p.created }; }
@@ -29,6 +30,7 @@ struct MonitorSnapshot {
     std::wstring telemetry = L"Aguardando inicio", phase = L"Pronto para monitorar", updated = L"--:--:--";
     ULONGLONG cycles = 0, eventCount = 0;
     size_t pending = 0, protectedCount = 0;
+    ShieldState shield;
 };
 class MonitorEngine {
     struct Job { Process process; std::map<DWORD, Process> family; bool probe = false; };
@@ -108,9 +110,14 @@ class MonitorEngine {
             for (auto& item : rows) {
                 auto& row = item.second;
                 if (row.process.pid != e.pid || !row.process.created || e.time < row.process.created) continue;
-                expected = (browser(row.process.name) || has(row.process.name, L"discord")) && trusted(row.process.sig);
+                expected = expectedStorageAccess(row.process, e.text);
                 attributed = true;
-                if (!expected) { row.storageAt = now; row.storagePath = e.text; row.storageAction = e.kind == LiveEvent::StorageRead ? L"ETW Read" : L"ETW Create/open solicitado"; }
+                if (!expected && browserStorage(e.text)) {
+                    row.storageAt = now; row.storagePath = e.text;
+                    row.storageAction = e.kind == LiveEvent::StorageRead ? L"ETW Read" : L"ETW Create/open solicitado";
+                    row.nextAnalysis = 0;
+                    shield.consider(row.process, e.text, row.ready);
+                }
                 break;
             }
             if (log && !expected) emit(1, L"ETW / STORAGE", std::to_wstring(e.pid) + L" | " +
@@ -125,6 +132,7 @@ class MonitorEngine {
         if (WSAStartup(MAKEWORD(2, 2), &ws)) { emit(2, L"ERRO", L"Nao foi possivel iniciar Winsock."); finished = true; return; }
         EtwMonitor etw;
         etw.start([this](LiveEvent e) { enqueue(std::move(e)); });
+        shield.coverage(etw.fileEnabled);
         { std::lock_guard<std::mutex> lock(dataMutex); data.telemetry = etw.status; }
         std::thread analyzer([this] {
             try { analyzeLoop(); }
@@ -141,6 +149,10 @@ class MonitorEngine {
         ULONGLONG lastLossCheck = 0;
         while (!stopRequested) {
             const ULONGLONG cycleStart = GetTickCount64();
+            shield.coverage(etw.fileEnabled && etw.consumerRunning);
+            if (etw.fileEnabled && !etw.consumerRunning) {
+                std::lock_guard<std::mutex> lock(dataMutex); data.telemetry = L"Consumidor ETW inativo | Shield desarmado";
+            }
             WarningLog log;
             auto all = processes(log); auto net = network(log);
             warnings(log);
@@ -199,8 +211,11 @@ class MonitorEngine {
                 }
                 if (external >= 10) p.add(2, L"Dez ou mais conexoes externas na amostra");
                 if (listener) p.add(2, L"Porta TCP LISTENING fora do loopback");
-                const bool expectedStorage = (browser(p.name) || has(p.name, L"discord")) && trusted(p.sig);
-                if (!expectedStorage && row.storageAt && cycleStart - row.storageAt < 60000) p.add(5, row.storageAction + L" em storage sensivel nos ultimos 60 s: " + row.storagePath);
+                const bool expectedStorage = expectedStorageAccess(p, row.storagePath);
+                if (!expectedStorage && row.storageAt && cycleStart - row.storageAt < 60000) {
+                    p.add(5, row.storageAction + L" em storage sensivel nos ultimos 60 s: " + row.storagePath);
+                    shield.consider(p, row.storagePath, row.ready);
+                }
                 if (row.ready && p.score >= 8 && p.score > row.peak) emit(p.score >= 13 ? 2 : 1, L"ALERTA", p.name + L" | PID " + std::to_wstring(p.pid) +
                     L" | score " + std::to_wstring(p.score) + L" | " + classification(p.score));
                 row.peak = std::max(row.peak, p.score);
@@ -240,6 +255,7 @@ class MonitorEngine {
             }
             while (!stopRequested && GetTickCount64() - cycleStart < intervalMs) Sleep(50);
         }
+        shield.coverage(false);
         etw.stop(); jobWake.notify_all();
         if (analyzer.joinable()) analyzer.join();
         consumeEvents();
@@ -249,9 +265,11 @@ class MonitorEngine {
         finished = true;
     }
 public:
+    ShieldController shield{[this](int level, const std::wstring& message) { emit(level, L"SHIELD", message); }};
     std::atomic<bool> stopRequested{false}, finished{true}, probeHandles{false};
     std::atomic<DWORD> intervalMs{1000};
-    ~MonitorEngine() { requestStop(); join(); }
+    MonitorEngine() { shield.start(); }
+    ~MonitorEngine() { requestStop(); join(); shield.shutdown(); }
     void enqueue(LiveEvent event) {
         std::lock_guard<std::mutex> lock(inputMutex);
         if (input.size() < 4096) input.push_back(std::move(event)); else ++dropped;
@@ -261,13 +279,17 @@ public:
         join(); rows.clear(); analyzed.clear(); warned.clear(); previousConnections.clear(); lastStorageEvent.clear();
         { std::lock_guard<std::mutex> lock(jobMutex); jobs.clear(); results.clear(); }
         stopRequested = false; finished = false;
-        emit(0, L"MONITOR", L"Iniciando sensores. Nenhum processo sera bloqueado ou encerrado.");
-        controller = std::thread([this] { try { run(); } catch (...) { emit(2, L"ERRO", L"Falha interna no monitor. Reinicie a coleta."); finished = true; } });
+        emit(0, L"MONITOR", L"Iniciando sensores. Shield inicia em detectar somente; habilite isolamento nas configuracoes.");
+        controller = std::thread([this] { try { run(); } catch (...) { shield.coverage(false); emit(2, L"ERRO", L"Falha interna no monitor. Reinicie a coleta."); finished = true; } });
         return true;
     }
-    void requestStop() { stopRequested = true; jobWake.notify_all(); }
+    void requestStop() { stopRequested = true; shield.coverage(false); jobWake.notify_all(); }
     void join() { if (controller.joinable()) controller.join(); }
-    MonitorSnapshot snapshot() { std::lock_guard<std::mutex> lock(dataMutex); return data; }
+    MonitorSnapshot snapshot() {
+        MonitorSnapshot copy;
+        { std::lock_guard<std::mutex> lock(dataMutex); copy = data; }
+        copy.shield = shield.snapshot(); return copy;
+    }
 };
 std::wstring rowDetails(const MonitorRow& row) {
     const auto& p = row.process;
@@ -307,6 +329,10 @@ std::wstring monitorReport(const MonitorSnapshot& s) {
       << L"Eventos ETW dependem de permissao, schemas e buffers. Historico limitado aos ultimos 1500 eventos.\r\n"
       << L"Correlacao de storage/rede: 60 segundos. Fontes Python: caminho absoluto, local, ate 1 MiB.\r\n"
       << L"Nenhum conteudo de cookies, tokens ou senhas e coletado. Revise linhas de comando antes de compartilhar.\r\n\r\n";
+    o << L"SHIELD\r\n" << s.shield.status << L"\r\n"
+      << L"ETW e reativo. Uma regra de saida nao desfaz leituras nem garante impedir exfiltracao.\r\n";
+    for (const auto& rule : s.shield.rules) o << L"Regra persistente: " << rule.name << L" | " << rule.path << L"\r\n";
+    o << L"\r\n";
     for (const auto& r : s.rows) o << L"========================================\r\n" << rowDetails(r) << L"\r\n";
     o << L"\r\nCONSOLE / HISTORICO\r\n";
     for (const auto& e : s.events) o << L"[" << e.time << L"] [" << e.category << L"] " << e.message << L"\r\n";

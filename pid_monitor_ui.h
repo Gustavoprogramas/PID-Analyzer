@@ -96,9 +96,9 @@ void paint(App& a, HDC dc) {
         text(g, navLabels[i], 62, y, 99, 26, 13, a.nav == i ? Color(244, 231, 255) : Color(165, 148, 184), a.nav == i);
     }
     roundPanel(g, 16, a.height - 147, 146, 105, Color(22, 15, 34), Color(49, 32, 69), 10);
-    text(g, L"SOMENTE LEITURA", 29, a.height - 132, 130, 21, 10, Color(190, 149, 231), true);
-    text(g, L"Observa e correlaciona.", 29, a.height - 103, 132, 20, 11, Color(152, 135, 170));
-    text(g, L"Sem bloquear processos.", 29, a.height - 84, 132, 20, 10, Color(152, 135, 170));
+    text(g, a.snapshot.shield.enabled ? L"SHIELD HABILITADO" : L"DETECTAR SOMENTE", 25, a.height - 132, 136, 21, 10, Color(190, 149, 231), true);
+    text(g, L"Regras de rede: " + std::to_wstring(a.snapshot.shield.rules.size()), 25, a.height - 103, 136, 20, 11, Color(152, 135, 170));
+    text(g, L"Gerenciar: Configuracoes", 25, a.height - 84, 136, 20, 10, Color(152, 135, 170));
     const int x = contentX(), cw = contentWidth(a);
     text(g, L"SEGURANCA  /  ATIVIDADE DO SISTEMA", x, 22, cw - 220, 20, 10, Color(158, 121, 197), true);
     text(g, L"Monitor de atividade", x, 48, cw - 250, 43, 29, Color(247, 240, 255), true);
@@ -157,7 +157,13 @@ void setDetail(App& a) {
     const int selected = ListView_GetNextItem(a.list, -1, LVNI_SELECTED);
     if (selected >= 0 && static_cast<size_t>(selected) < a.visible.size()) a.selected = a.visible[selected];
     std::wstring value = L"Selecione um processo para inspecionar\r\nas evidencias, a linha de comando e a rede.\r\n\r\nA coleta detalhada ocorre em segundo plano.\r\n\r\nNenhum dado de cookies ou tokens e lido.";
-    for (const auto& row : a.snapshot.rows) if (processKey(row.process) == a.selected) { value = rowDetails(row); break; }
+    for (const auto& row : a.snapshot.rows) if (processKey(row.process) == a.selected) {
+        value = rowDetails(row);
+        for (const auto& rule : a.snapshot.shield.rules) if (rule.path == normalize(row.process.path)) {
+            value = L"SHIELD: REGRA DE SAIDA POR EXECUTAVEL\r\nTodas as instancias deste caminho. Restaurar em Configuracoes.\r\n\r\n" + value; break;
+        }
+        break;
+    }
     if (value != a.lastDetail) {
         const LRESULT scroll = SendMessageW(a.details, EM_GETFIRSTVISIBLELINE, 0, 0);
         SetWindowTextW(a.details, value.c_str()); SendMessageW(a.details, EM_LINESCROLL, 0, scroll);
@@ -199,6 +205,7 @@ void refresh(App& a) {
     EnableWindow(a.buttons[1], !a.engine.finished && !a.engine.stopRequested);
     RECT top{178, 0, a.width, 258}, bottom{178, a.height - 64, a.width, a.height};
     InvalidateRect(a.window, &top, FALSE); InvalidateRect(a.window, &bottom, FALSE);
+    RECT shieldPanel{16, a.height - 147, 164, a.height - 41}; InvalidateRect(a.window, &shieldPanel, FALSE);
 }
 void settings(App& a) {
     HMENU menu = CreatePopupMenu();
@@ -208,6 +215,12 @@ void settings(App& a) {
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING | (a.engine.probeHandles ? MF_CHECKED : 0), 304, L"Consultar handles em candidatos (mais lento)");
     AppendMenuW(menu, MF_STRING, 305, L"Sobre cobertura e privacidade");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | (!a.snapshot.shield.enabled ? MF_CHECKED : 0), 306, L"Shield: detectar somente");
+    AppendMenuW(menu, MF_STRING | (a.snapshot.shield.enabled ? MF_CHECKED : 0), 307, L"Shield: isolar executavel da rede...");
+    AppendMenuW(menu, MF_STRING, 308, L"Shield: bloquear leitura com driver (em desenvolvimento)...");
+    AppendMenuW(menu, MF_STRING, 309, L"Shield: consultar regras e disponibilidade...");
+    AppendMenuW(menu, MF_STRING, 310, L"Shield: restaurar todas as regras gerenciadas...");
     RECT r{}; GetWindowRect(a.buttons[2], &r);
     int action = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_LEFTALIGN, r.left, r.bottom + 4, 0, a.window, nullptr);
     DestroyMenu(menu);
@@ -218,8 +231,38 @@ void settings(App& a) {
         L"Rede: amostragem de 0,5 a 2 segundos; conexoes mais rapidas podem escapar. Nao identifica URLs HTTPS.\n\n"
         L"Scripts: leitura apenas do .py local associado, com caminho absoluto e ate 1 MiB. Comentarios e exemplos tambem podem corresponder aos indicadores.\n\n"
         L"Discord/navegadores: observa nomes de arquivos, nunca o conteudo de tokens, cookies ou senhas.\n\n"
-        L"Historico: ultimos 1500 eventos na memoria. Persistencia e assinaturas sao reavaliadas periodicamente. Nenhum processo e bloqueado.\n\n"
+        L"Historico: ultimos 1500 eventos na memoria. Persistencia e assinaturas sao reavaliadas periodicamente.\n\n"
+        L"Shield e opcional: cria regras de saida por executavel. ETW detecta depois da operacao; pode haver leitura e envio antes do bloqueio.\n\n"
         L"A ausencia de alertas nao garante ausencia de malware.", L"Sentinel / Cobertura", MB_OK | MB_ICONINFORMATION);
+    if (action == 306) a.engine.shield.enable(false);
+    if (action == 307 && !a.uiTest) {
+        if (!a.snapshot.shield.coverage) MessageBoxW(a.window,
+            L"Inicie o monitor como administrador e verifique se o ETW de arquivos esta ativo. O Shield nao pode ser habilitado sem esse sensor.",
+            L"Shield indisponivel", MB_OK | MB_ICONWARNING);
+        else if (MessageBoxW(a.window,
+            L"Habilitar isolamento automatico para interpretadores ou processos com score >= 8 acessando storage sensivel?\n\n"
+            L"A regra bloqueia saidas de rede de TODAS as instancias do mesmo executavel, inclusive rede local. Isolar Python afeta outros scripts que usam esse Python.\n\n"
+            L"Regras permanecem ao parar/fechar o app ou reiniciar o PC. Use Configuracoes > Restaurar todas as regras gerenciadas para remove-las.\n\n"
+            L"ETW e reativo: leitura e envio podem ocorrer antes do bloqueio. Nenhum processo sera suspenso. Requer administrador e Firewall ativo.",
+            L"Habilitar Shield Mode", MB_YESNO | MB_DEFBUTTON2 | MB_ICONWARNING) == IDYES) a.engine.shield.enable(true);
+    }
+    if (action == 308) MessageBoxW(a.window,
+        L"SentinelGuard e uma base experimental em driver\\. Nao existe driver compilado, assinado ou validado neste pacote.\n\n"
+        L"O bloqueio preventivo ainda nao pode ser ativado pela interface. Consulte driver\\README.md para compilar com WDK e testar a politica em uma VM.",
+        L"SentinelGuard / Em desenvolvimento", MB_OK | MB_ICONINFORMATION);
+    if (action == 309) {
+        const auto shield = a.engine.shield.snapshot();
+        std::wstring message = shield.status + L"\n\nRegras persistentes gerenciadas: " + std::to_wstring(shield.rules.size()) + L"\n";
+        for (size_t i = 0; i < shield.rules.size() && i < 20; ++i) message += L"\n" + shield.rules[i].path;
+        if (shield.rules.size() > 20) message += L"\n... Exportar relatorio para a lista completa.";
+        message += L"\n\nA lista identifica regras gerenciadas; politicas externas podem alterar a efetividade do Firewall.";
+        MessageBoxW(a.window, message.c_str(), L"Shield / Regras de rede", MB_OK | MB_ICONINFORMATION);
+    }
+    if (action == 310 && !a.uiTest && MessageBoxW(a.window,
+        L"Remover todas as regras de rede criadas pelo Shield, inclusive de sessoes anteriores?\n\n"
+        L"A operacao exige administrador e tambem desativa novos isolamentos. Outras regras do Firewall permanecem intactas. Falhas serao registradas no console.",
+        L"Restaurar rede dos executaveis", MB_YESNO | MB_DEFBUTTON2 | MB_ICONWARNING) == IDYES) a.engine.shield.restore();
+    refresh(a);
 }
 void exportReport(App& a) {
     wchar_t filename[32768] = L"sentinel-relatorio.txt";
@@ -261,12 +304,22 @@ bool screenshot(App& a, const std::wstring& path) {
     HDC source = GetDC(a.window), memory = CreateCompatibleDC(source);
     HBITMAP bitmap = CreateCompatibleBitmap(source, a.width, a.height);
     HGDIOBJ old = SelectObject(memory, bitmap);
-    PrintWindow(a.window, memory, PW_CLIENTONLY);
+    paint(a, memory);
+    for (HWND child = GetWindow(a.window, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT)) {
+        RECT bounds{}; GetWindowRect(child, &bounds);
+        MapWindowPoints(nullptr, a.window, reinterpret_cast<POINT*>(&bounds), 2);
+        const int state = SaveDC(memory);
+        SetViewportOrgEx(memory, bounds.left, bounds.top, nullptr);
+        IntersectClipRect(memory, 0, 0, bounds.right - bounds.left, bounds.bottom - bounds.top);
+        SendMessageW(child, WM_PRINT, reinterpret_cast<WPARAM>(memory), PRF_CLIENT | PRF_NONCLIENT | PRF_CHILDREN | PRF_ERASEBKGND);
+        RestoreDC(memory, state);
+    }
+    const bool rendered = GetPixel(memory, 5, 5) == RGB(16, 11, 26) && GetPixel(memory, 190, 5) == background;
     bool saved = false;
     {
         Bitmap image(bitmap, nullptr);
         UINT count = 0, size = 0; GetImageEncodersSize(&count, &size); std::vector<BYTE> bytes(size);
-        if (size && GetImageEncoders(count, size, reinterpret_cast<ImageCodecInfo*>(bytes.data())) == Ok) {
+        if (rendered && size && GetImageEncoders(count, size, reinterpret_cast<ImageCodecInfo*>(bytes.data())) == Ok) {
             auto codecs = reinterpret_cast<ImageCodecInfo*>(bytes.data());
             for (UINT i = 0; i < count; ++i) if (wcscmp(codecs[i].MimeType, L"image/png") == 0) { saved = image.Save(path.c_str(), &codecs[i].Clsid) == Ok; break; }
         }
@@ -333,6 +386,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
         if (a.uiTest && GetTickCount64() - a.started > 10000 && !a.screenshotDone) {
             a.screenshotDone = true;
             uiCheck(a, !a.engine.finished && a.snapshot.cycles >= 2, L"start button runs live collection");
+            uiCheck(a, !a.snapshot.shield.enabled, L"Shield starts in detect-only mode");
             uiCheck(a, !IsWindowEnabled(a.buttons[0]) && IsWindowEnabled(a.buttons[1]), L"running button states");
             bool assets = true; for (auto& button : a.artwork) for (auto& variant : button) if (!variant.bitmap) assets = false;
             uiCheck(a, assets && a.cardSurface.bitmap && a.consoleSurface.bitmap, L"exported buttons and interface surfaces embedded and decoded");

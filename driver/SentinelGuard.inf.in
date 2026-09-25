@@ -1,0 +1,46 @@
+; Modelo: preencher a altitude atribuida e gerar/assinar o catalogo antes de instalar.
+[Version]
+Signature="$Windows NT$"
+Class="ActivityMonitor"
+ClassGuid={b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
+Provider=%Provider%
+DriverVer=09/24/2026,0.2.0.0
+CatalogFile=SentinelGuard.cat
+PnpLockdown=1
+
+[DestinationDirs]
+DriverFiles=13
+
+[DefaultInstall.NTamd64]
+CopyFiles=DriverFiles
+
+[DefaultInstall.NTamd64.Services]
+AddService=SentinelGuard,,Service
+
+[DriverFiles]
+SentinelGuard.sys
+
+[Service]
+DisplayName=%ServiceName%
+ServiceBinary=%13%\SentinelGuard.sys
+Dependencies=FltMgr
+ServiceType=2
+StartType=3
+ErrorControl=1
+LoadOrderGroup="FSFilter Activity Monitor"
+AddReg=Instances
+
+[Instances]
+HKR,"Parameters\Instances","DefaultInstance",0x00000000,"SentinelGuard Instance"
+HKR,"Parameters\Instances\SentinelGuard Instance","Altitude",0x00000000,"@ASSIGNED_ALTITUDE@"
+HKR,"Parameters\Instances\SentinelGuard Instance","Flags",0x00010001,0
+
+[SourceDisksFiles]
+SentinelGuard.sys=1
+
+[SourceDisksNames]
+1=%ServiceName%,,,
+
+[Strings]
+Provider="PID Analyzer"
+ServiceName="SentinelGuard (experimental)"

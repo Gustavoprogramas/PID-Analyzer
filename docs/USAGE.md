@@ -11,12 +11,28 @@ A interface mostra dados reais, inclusive análises pendentes. Assinaturas, scri
 - **ETW de processos e arquivos:** tenta receber eventos de criação/saída de processos e abertura/leitura em locais sensíveis de Discord e navegadores. Usa uma sessão própria, filtros de IDs de eventos e metadados TDH. Não instala driver nem muda configurações de segurança. A sessão é desligada ao parar/fechar o monitor. Apenas uma sessão `PID.Sentinel.Live` pode existir; uma sessão já existente não é encerrada automaticamente.
 - **Permissões:** ETW pode exigir execução como administrador. Se a inicialização ou um provedor falhar, o erro aparece no console e no rodapé, e as consultas periódicas continuam. Evento Open significa solicitação de abertura; Read identifica uma operação de leitura, sem revelar conteúdo nem comprovar exfiltração. Nem todo evento pode ser associado a um PID, especialmente depois que a thread/processo termina.
 - **Rede TCP/UDP:** amostragem de 0,5–2 segundos. Conexões que começam e terminam entre amostras podem escapar. Não há captura de pacotes, inspeção de HTTPS nem identificação de URL/webhook pelo tráfego.
-- **Correlação:** conexões externas e operações ETW em storage sensível podem contribuir por 60 segundos. Observações repetidas não acumulam os mesmos pontos. A identidade do processo usa PID e data de criação, evitando atribuir eventos antigos a um PID reutilizado. Aplicativos de navegador/Discord com assinatura válida não ganham pontos por acessos ETW esperados ao storage.
+- **Correlação:** conexões externas e operações ETW em storage sensível podem contribuir por 60 segundos. Observações repetidas não acumulam os mesmos pontos. A identidade do processo usa PID e data de criação, evitando atribuir eventos antigos a um PID reutilizado. Acesso esperado exige nome exato, assinatura válida do fornecedor e correspondência entre aplicativo e família de storage.
 - **Análise estática de Python:** consulta somente um `.py`/`.pyw` de caminho absoluto e local associado à linha de comando, limitado a 1 MiB. Exige combinação de referências a storage, credenciais e biblioteca HTTP; webhook adiciona peso à combinação. Não executa o script nem extrai tokens. Comentários/exemplos podem gerar indicadores, e código ofuscado, `-c`, `-m`, caminhos relativos e scripts já removidos podem escapar.
 - **Revisões:** interpretadores são agendados para nova análise em cerca de 15 segundos; outros processos, persistência e cache de assinaturas, em cerca de 60 segundos, conforme a fila de trabalho. DLLs são consultadas em interpretadores ou processos com sinais iniciais. Handles opcionais têm limite de 1 segundo por candidato no monitor.
 - **Histórico:** até 1500 eventos em memória, limitado à sessão do aplicativo. O console agrega repetições frequentes do mesmo evento de storage. Limites de filas, caches e perdas informadas pelo ETW são registrados. O relatório exportado inclui também processos atuais com risco baixo ou análise pendente.
 
 Nenhum conteúdo de LevelDB, senhas, cookies ou tokens é lido. O scanner lê metadados desses arquivos via ETW/handles e, separadamente, o código-fonte do script Python associado. Não há proteção preventiva nem garantia de detectar todo stealer.
+
+## Shield Mode de rede
+
+O monitor inicia em **Detectar somente**. Nas Configurações é possível habilitar isolamento automático, consultar disponibilidade/regras e restaurar todas as regras gerenciadas. A confirmação de habilitação explica o alcance por executável. Sem ETW de arquivos, privilégios administrativos ou Firewall disponível, o console registra a falha e o modo permanece desabilitado.
+
+A decisão exige um evento de abertura/leitura em storage reconhecido, associado a um PID com data de criação compatível. Interpretadores são candidatos imediatamente; outros executáveis exigem análise concluída e score ≥ 8, incluindo os sinais temporais. Uma conexão externa aumenta o score, mas não é pré-requisito: esperar observar a conexão poderia perder o primeiro envio. A correlação permanece válida por 60 segundos. Processos que já terminaram, acessos sem atribuição e leituras ocorridas antes de iniciar o sensor podem escapar.
+
+O trabalho do Firewall ocorre numa thread separada. Antes de adicionar a regra, são conferidos novamente o processo vivo, PID/data de criação, caminho completo e condição de processo crítico. Caminhos remotos, o próprio Sentinel e componentes do Windows que não sejam interpretadores são recusados. Falhas são visíveis no console; não são apresentadas como isolamento bem-sucedido.
+
+A regra usa `INetFwPolicy2`/`INetFwRule`, saída, qualquer protocolo e todos os perfis. Seu nome inclui um GUID, e grupo/descrição identificam sua propriedade. **É uma regra por caminho, não por PID**: outros processos e execuções futuras daquele executável também serão afetados. O app não altera a política global nem ativa serviços/perfis desabilitados. Políticas corporativas podem impedir regras locais.
+
+As regras persistem após fechar o app ou reiniciar o Windows. Parar o monitor ou mudar para Detectar somente impede novos isolamentos, mantendo as regras anteriores. Ao reiniciar a coleta, habilite o Shield novamente. **Restaurar todas as regras gerenciadas** enumera regras persistentes, verifica nome, grupo, descrição, ação, direção e caminho antes de remover; falhas não apagam o registro da regra. A restauração desativa novos bloqueios, evitando isolamento imediato novamente. O app não remove regras de terceiros. Para recuperação manual, as regras aparecem no Firewall Avançado no grupo **PID Sentinel Shield**.
+
+Limites: há latência do ETW, intervalo do monitor (0,5–2 s), filas, análise e propagação do Firewall. A regra não desfaz dados lidos/enviados, não garante encerrar toda conexão já existente e não impede que outro executável envie dados em nome do alvo. Não há suspensão, proteção contra injeção em processos permitidos ou resistência a um atacante administrador. Os testes automatizados usam Firewall simulado; a cadeia ETW elevado → regra real → tráfego deve ser validada em VM.
+
+A etapa preventiva experimental é descrita em [SentinelGuard](../driver/README.md). Ela não é ativada pela interface desta versão.
 
 ## Compilação e distribuição
 
@@ -27,7 +43,7 @@ cd PID-Analyzer
 cl /std:c++17 /EHsc /O2 /MT pid.cpp /link iphlpapi.lib ws2_32.lib wintrust.lib crypt32.lib /OUT:pid.exe
 ```
 
-As bibliotecas adicionais do Windows estão declaradas no fonte com `#pragma comment(lib, ...)`. Mantenha `pid_script.h`, `pid_etw.h`, `pid_monitor.h`, `pid_monitor_ui.h` e `ui-assets/embedded_assets.h` junto ao projeto para recompilar.
+As bibliotecas adicionais do Windows estão declaradas no fonte com `#pragma comment(lib, ...)`. Mantenha `pid_script.h`, `pid_etw.h`, `pid_monitor.h`, `pid_shield.h`, `pid_monitor_ui.h` e `ui-assets/embedded_assets.h` junto ao projeto para recompilar. O `.exe` continua usando `/MT`; o driver possui compilação, assinatura e distribuição separadas.
 
 O `ui-assets/export.js` exporta as artes dos botões e painéis a partir do HTML/CSS com Playwright. O exportador também grava `embedded_assets.h`, incorporado ao executável. Para alterar as artes:
 

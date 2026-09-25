@@ -115,6 +115,7 @@ class EtwMonitor {
         return EnableTraceEx2(session, &provider, EVENT_CONTROL_CODE_ENABLE_PROVIDER, TRACE_LEVEL_INFORMATION, keyword, 0, 0, &params);
     }
 public:
+    std::atomic<bool> consumerRunning{false};
     std::wstring status = L"ETW desligado";
     bool fileEnabled = false, processEnabled = false;
     ~EtwMonitor() { stop(); }
@@ -148,9 +149,11 @@ public:
         if (procError) notice(L"ETW processo: erro " + std::to_wstring(procError));
         if (fileError) notice(L"ETW arquivo: erro " + std::to_wstring(fileError));
         const TRACEHANDLE openedTrace = trace;
+        consumerRunning = true;
         consumer = std::thread([this, openedTrace] {
             TRACEHANDLE h = openedTrace;
             const ULONG result = ProcessTrace(&h, 1, nullptr, nullptr);
+            consumerRunning = false;
             if (result != ERROR_SUCCESS && result != ERROR_CANCELLED) notice(L"Consumidor ETW terminou: erro " + std::to_wstring(result));
         });
     }
